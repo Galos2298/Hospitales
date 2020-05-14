@@ -1,0 +1,216 @@
+/*Nombre y fecha de toma de posesi�n de los m�dicos pediatras del hospital.
+Nombre de los pacientes residentes en Madrid capital.
+Nombre de los m�dicos que autorizaron ingresos entre enero y febrero de 2010.
+Nombres y apellidos de los pacientes que ingresaron entre enero y mayo de 2009 y son al�rgicos.
+*/
+
+/*1.Nombre y fecha de toma de posesi�n de los m�dicos pediatras del hospital.*/
+	SELECT *
+	FROM [dbo].[MEDICOS]
+
+SELECT [Nombre de Medico],[Fecha Ingreso]
+FROM dbo.[MEDICOS]
+WHERE Especialidad='Pediatria'
+
+/*2.Nombre de los pacientes residentes en Madrid capital.*/
+	SELECT *
+	FROM dbo.[PACIENTES]
+
+SELECT Nombre
+FROM dbo.[PACIENTES]
+WHERE [Poblacion]='Madrid'
+
+/*3.Nombre de los m�dicos que autorizaron ingresos entre enero y febrero de 2010.*/
+
+	SELECT *
+	FROM dbo.[INGRESOS]
+
+SELECT [Codigo Identificacion]
+FROM dbo.[INGRESOS]
+where [Fecha de ingreso] between '1/02/2010' and '28/02/2010'
+(select[Nombre de Medico]
+from dbo.[MEDICOS]
+where [Codigo identificacion]='AJH')
+
+/*4.Nombres y apellidos de los pacientes que ingresaron entre enero y mayo de 2009 y son al�rgicos.*/
+SELECT *
+	FROM dbo.[INGRESOS]
+
+SELECT P.Nombre,P.Apellidos 
+FROM dbo.PACIENTES AS P
+INNER JOIN dbo.INGRESOS AS I 
+ON P.[Numero de historial]=I.[Numero de historial]
+WHERE (I.[Fecha de ingreso] BETWEEN '01/01/2009' AND '31/05/2009') AND (Observaciones like 'alergico%')
+
+SELECT P.Nombre,P.Apellidos 
+FROM dbo.PACIENTES AS P
+INNER JOIN dbo.INGRESOS AS I 
+ON P.[Numero de historial]=I.[Numero de historial]
+WHERE (I.[Fecha de ingreso] BETWEEN '01/01/2009' AND '31/05/2009') AND (Alergico='s')
+
+ /*5.Pacientes cuyo ingreso haya sido autorizado por el doctor Antonio Ja�n Hern�ndez.
+*/
+ 
+select*
+from dbo.[MEDICOS]
+
+select I.[Fecha de ingreso],P.Nombre
+from dbo.[INGRESOS] AS I 
+JOIN dbo.PACIENTES AS P
+ON P.[Numero de historial]=I.[Numero de historial] 
+WHERE [Codigo Identificacion]='AJH'
+	(select[Nombre de Medico]
+	from dbo.[MEDICOS]
+	WHERE [Codigo identificacion]='AJH'
+	)
+	
+ /*pProcedimiesntos almacenados
+ 1ntroducir un m�dico a la base de datos, con los siguientes restricciones:
+Los N�meros de Colegiado m�s antiguos son los que son entre 0 y 999. Hoy en d�a, no se aceptan estos n�meros.
+2.Mostrar los nombres y otros datos (fecha, planta, cama, etc..) de los pacientes ingresados entre dos fechas. E.g. EXEC usp_MostrarPacientesIngresados �1/1/2009�, 1/2/2009�
+ */
+
+ /*Introducir un m�dico a la base de datos, con los siguientes restricciones:
+Los N�meros de Colegiado m�s antiguos son los que son entre 0 y 999. Hoy en d�a, no se aceptan estos n�meros.
+*/
+
+CREATE PROCEDURE pr_introducirMedicos
+@p_Codigoidentificacion varchar(4),
+@p_NombredeMedico char(15),
+@p_ApellidosdeMedico char(30),
+@p_Especialidad char(25),
+@p_FechaIngreso date,
+@p_Cargo char(25),
+@p_NumerodeColegiado int,
+@p_Observaciones char(500)
+
+as
+
+BEGIN
+  if @p_NumerodeColegiado between 0 and 999
+	return -1
+
+	begin try
+		insert into dbo.MEDICOS
+		([Codigo identificacion],
+		 [Nombre de Medico],
+         [Apellidos de Medico] ,    
+         [Especialidad],
+         [Fecha Ingreso],
+		 [Cargo],
+		 [Numero de Colegiado],
+         Observaciones
+		)
+		values
+		(@p_Codigoidentificacion,
+			@p_NombredeMedico,
+			@p_ApellidosdeMedico,
+			@p_Especialidad,
+			@p_FechaIngreso,
+			@p_Cargo, 
+			@p_NumerodeColegiado,
+			@p_Observaciones
+		)
+		return 0
+		end try
+		begin catch
+			return @@ERROR
+		END CATCH
+END
+
+/*Mostrar los nombres y otros datos (fecha, planta, cama, etc..) de los pacientes ingresados entre dos fechas. E.g. EXEC usp_MostrarPacientesIngresados �1/1/2009�, 1/2/2009�*/
+create PROCEDURE usp_MostrarPacientesIngresados 
+@p_fechadeinicio date,
+@p_fechadefinal date
+as
+begin 
+	select p.Nombre,p.Apellidos,i.[Numero de historial],i.[Fecha de ingreso],i.Diagnostico,i.Alergico,i.Observaciones
+	from dbo.INGRESOS as I
+	join dbo.PACIENTES as P
+	on i.[Numero de historial]=P.[Numero de Historial]
+	where i.[Fecha de ingreso] between @p_fechadeinicio and @p_fechadefinal
+
+	end
+
+
+/*1Contar el n�mero de pacientes en el sistema
+2Contar el n�mero de pacientes que son:
+	1Hombre
+	2Mujeres
+*/
+
+/*1Contar el n�mero de pacientes en el sistema*/
+
+CREATE FUNCTION FCONTARPACIENTE(@pacientes tinyint)
+returns int
+as
+BEGIN
+	DECLARE @NUMERODEPACIENTES  tinyint
+	SELECT @NUMERODEPACIENTES = COUNT([N Seguridad Social])
+	FROM dbo.PACIENTES
+	RETURN @NUMERODEPACIENTES 
+END
+
+select [Numero de Historial],FCONTARPACIENTES(pacientes)
+from dbo.PACIENTES
+
+
+/*2Contar el n�mero de pacientes que son:
+	1Hombre
+	2Mujeres
+*/
+
+CREATE FUNCTION [funcionNumeroPacientesSegunSexo]
+(
+	@sexo nchar(1)
+)
+RETURNS int
+AS
+BEGIN
+	-- Declare the return variable here
+	DECLARE @NumHistorial int
+
+	-- Add the T-SQL statements to compute the return value here
+	SELECT @NumHistorial = COUNT([Numero de Historial])
+	FROM dbo.Pacientes
+	WHERE Sexo = @sexo
+
+	-- Return the result of the function
+	RETURN @NumHistorial
+
+END
+GO
+
+
+/*AVANZADO*/
+
+
+USE [Hospital]
+GO
+
+INSERT INTO dbo.[PACIENTES]
+           ([N Seguridad Social]
+           ,[Nombre]
+           ,[Apellidos]
+           ,[Domicilio]
+           ,[Poblacion]
+           ,[Provincia]
+           ,[Codigo Postal]
+           ,[Telefono]
+           ,[Numero de Historial]
+           ,[Sexo]
+           ,[foto])
+     VALUES
+           ('08/7234823'
+           ,'Angel'
+           ,'Ruiz Picasso'
+           ,'C/Salmeron,212'
+           ,'Madrid'
+           ,'Madrid'
+           ,'28028'
+           ,'915653433'
+           ,'112454-L'
+           ,'h',
+		   (select * from openrowset (bulk 'C:\users\chris\deskopt\foto\christian.txt',single_blob) as foto);
+
+
